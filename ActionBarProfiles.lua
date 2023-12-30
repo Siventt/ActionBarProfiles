@@ -1,179 +1,213 @@
 local ABP_PlayerName = nil;
-local ABP_SpellBookNameToId = {};
-local ABP_InventoryItemNameToId = {};
-local ABP_BagItemNameToId = {};
 local MAX_ACTIONS = 144;
 
 function ABP_OnLoad()
 	this:RegisterEvent("VARIABLES_LOADED");
 	
-	SLASH_ABP1 = "/ABP";
-	SlashCmdList["ABP"] = function(msg)
-		ABP_SlashCommand(msg);
+	SlashCmdList["ABP"] = ABP_SlashCommand;
+	SLASH_ABP1 = "/abp";
+end
+
+function ABP_SlashCommand(msg)
+	if (msg == "") then
+		DEFAULT_CHAT_FRAME:AddMessage("~~ ActionBarProfiles options:");
+		DEFAULT_CHAT_FRAME:AddMessage("/abp save [profileName]");
+		DEFAULT_CHAT_FRAME:AddMessage("/abp load [profileName]");
+		DEFAULT_CHAT_FRAME:AddMessage("/abp remove [profileName]");
+		DEFAULT_CHAT_FRAME:AddMessage("/abp list");
+	end
+	for profileName in string.gfind(msg, "save (.*)") do
+		ABP_SaveProfile( profileName );
+	end
+	for profileName in string.gfind(msg, "load (.*)") do
+		ABP_LoadProfile( profileName );
+	end
+	for profileName in string.gfind(msg, "remove (.*)") do
+		ABP_RemoveProfile( profileName );
+	end
+	for profileName in string.gfind(msg, "list") do
+		ABP_ListProfiles();
 	end
 end
 
-function ABP_SaveProfile( profileName )
-	if ( profileName == "" ) then
+function ABP_SaveProfile(profileName)
+	if (profileName == "") then
 		return;
 	end;
-	if ( ABP_Layout[ ABP_PlayerName ][ profileName ] ~= nil ) then
-		ABP_Layout[ ABP_PlayerName ][ profileName ] = nil;
-	end
-	ABP_Layout[ ABP_PlayerName ][ profileName ] = {};
-	ABP_Layout[ ABP_PlayerName ][ profileName ][ "spells" ] = {};
-	ABP_Layout[ ABP_PlayerName ][ profileName ][ "macros" ] = {};
-	ABP_Layout[ ABP_PlayerName ][ profileName ][ "items" ] = {};
-	
+	ABP_Layout[ABP_PlayerName][profileName] = {};
 	ABP_Tooltip:SetOwner(this, "ANCHOR_NONE");
-	
 	local scStatus = GetCVar("autoSelfCast");
-	SetCVar( "autoSelfCast", 0 );
+	SetCVar("autoSelfCast", 0);
+	local macroName, isASpell, spellName, rank, itemName;
+
 	for i = 1, MAX_ACTIONS do
-		if ( HasAction( i ) ~= nil ) then
-			local macroName = GetActionText( i );
-			if ( macroName ~= nil ) then -- It is a macro
-				ABP_Layout[ ABP_PlayerName ][ profileName ][ "macros" ][ i ] = macroName;
-			else -- It is a spell or an item
+		if (HasAction(i)) then
+			macroName = GetActionText(i);
+			if (macroName) then
+				ABP_Layout[ABP_PlayerName][profileName][i] = {};
+				ABP_Layout[ABP_PlayerName][profileName][i]["macro"] = macroName;
+			else
 				ABP_Tooltip:ClearLines();
-				ABP_Tooltip:SetAction( i );
+				ABP_Tooltip:SetAction(i);
 				
-				PickupAction( i );
-				local isASpell = CursorHasSpell();
-				PlaceAction( i );
-				if ( isASpell ) then -- It is a spell
-					local spellName = nil;
-					local rank = nil;
-					
+				PickupAction(i);
+				isASpell = CursorHasSpell();
+				PlaceAction(i);
+				if (isASpell) then
+					spellName = nil;
+					rank = nil;
 					if (ABP_TooltipTextLeft1:IsShown()) then
 						spellName = ABP_TooltipTextLeft1:GetText();
 					end
 					if (ABP_TooltipTextRight1:IsShown()) then
 						rank = ABP_TooltipTextRight1:GetText();
 					end
-					
-					ABP_Layout[ ABP_PlayerName ][ profileName ][ "spells" ][ i ] = {};
-					ABP_Layout[ ABP_PlayerName ][ profileName ][ "spells" ][ i ][ "name" ] = spellName;
-					ABP_Layout[ ABP_PlayerName ][ profileName ][ "spells" ][ i ][ "rank" ] = rank; -- can be text or nil
-				else -- It is an item
-					local itemName = nil;
-					
+					ABP_Layout[ABP_PlayerName][profileName][i] = {};
+					ABP_Layout[ABP_PlayerName][profileName][i]["spell"] = spellName;
+					ABP_Layout[ABP_PlayerName][profileName][i]["rank"] = rank; -- can be text or nil
+				else
+					itemName = nil;
 					if (ABP_TooltipTextLeft1:IsShown()) then
 						itemName = ABP_TooltipTextLeft1:GetText();
 					end
-					
-					ABP_Layout[ ABP_PlayerName ][ profileName ][ "items" ][ i ] = itemName;
+					ABP_Layout[ABP_PlayerName][profileName][i] = {};
+					ABP_Layout[ABP_PlayerName][profileName][i]["item"] = itemName;
 				end
 			end
 		end
 	end
-	
-	SetCVar( "autoSelfCast", scStatus );
-	DEFAULT_CHAT_FRAME:AddMessage( "Profile \""..profileName.."\" has been saved." );
+	SetCVar("autoSelfCast", scStatus);
+	DEFAULT_CHAT_FRAME:AddMessage("Profile \""..profileName.."\" has been saved.");
 end
 
-function ABP_LoadProfile( profileName )
-	if ( ABP_Layout[ ABP_PlayerName ][ profileName ] == nil ) then
-		DEFAULT_CHAT_FRAME:AddMessage( "Profile \""..profileName.."\" has not been saved previously and cannot be loaded." );
+function ABP_LoadProfile(profileName)
+	if (ABP_Layout[ABP_PlayerName][profileName] == nil) then
+		DEFAULT_CHAT_FRAME:AddMessage("Profile \""..profileName.."\" has not been saved previously and cannot be loaded.");
 		return;
 	end
 	local scStatus = GetCVar("autoSelfCast");
-	SetCVar( "autoSelfCast", 0 );
+	SetCVar("autoSelfCast", 0);
+	ABP_Tooltip:SetOwner(this, "ANCHOR_NONE");
+
 	-- First find ids of all spells and items because vanilla API sucks and you can't fetch spells by name.
-	-- Spells
+	local ABP_SpellIds = ABP_SpellBookNameToId();
+	local ABP_EquippedGearIds = ABP_EquippedGearToId();
+	local ABP_BagItemIds = ABP_BagItemsToId();
+	local spellName, spellRank, spellID, macroIdx, itemName, itemID, bagID, slotID;
+
+	-- Place spells, items and macros on the action bars.
+	for i = 1, MAX_ACTIONS do
+		if (ABP_Layout[ABP_PlayerName][profileName][i]) then
+			-- Spell
+			if (ABP_Layout[ABP_PlayerName][profileName][i]["spell"]) then
+				spellName = ABP_Layout[ABP_PlayerName][profileName][i]["spell"];
+				spellRank = ABP_Layout[ABP_PlayerName][profileName][i]["rank"];
+				if (spellRank) then spellName = spellName.." "..spellRank; end
+				spellID = ABP_SpellIds[spellName];
+				if (spellID == nil) then
+					DEFAULT_CHAT_FRAME:AddMessage("Spell \""..spellName.."\" is not learnt at the moment.");
+					PickupAction(i);
+					ClearCursor();
+				else
+					PickupSpell(spellID, BOOKTYPE_SPELL);
+					PlaceAction(i);
+				end
+			-- Item
+			elseif (ABP_Layout[ABP_PlayerName][profileName][i]["item"]) then
+				itemName = ABP_Layout[ABP_PlayerName][profileName][i]["item"];
+				if (ABP_EquippedGearIds[itemName]) then
+					itemID = ABP_EquippedGearIds[itemName];
+					PickupInventoryItem(itemID);
+					PlaceAction(i);
+				elseif (ABP_BagItemIds[itemName] ~= nil ) then
+					bagID = ABP_BagItemIds[itemName]["bag"];
+					slotID = ABP_BagItemIds[itemName]["slot"];
+					PickupContainerItem(bagID, slotID);
+					PlaceAction(i);
+				end
+			-- Macro
+			elseif (ABP_Layout[ABP_PlayerName][profileName][i]["macro"]) then
+				macroIdx = GetMacroIndexByName(ABP_Layout[ABP_PlayerName][profileName][i]["macro"]);
+				if (macroIdx > 0) then
+					PickupMacro(macroIdx);
+					PlaceAction(i);
+				end
+			-- [i] is empty, so clear the slot
+			else
+				PickupAction(i);
+				ClearCursor();
+			end
+		else -- [i] is null, so clear the slot
+			PickupAction(i);
+			ClearCursor();
+		end
+		ClearCursor();
+	end
+
+	SetCVar( "autoSelfCast", scStatus );
+	DEFAULT_CHAT_FRAME:AddMessage( "Profile \""..profileName.."\" has been loaded." );
+end
+
+function ABP_SpellBookNameToId()
+	local ABP_SpellIds = {}
+	local ABP_InventoryItemNameToId = {}
+	local ABP_BagItemNameToId = {}
+	local name, _, offset, numSpells, spellName, spellRank;
+	-- "_" is not used but has to be declared for GetSpellTabInfo.
+
 	for i = 1, MAX_SKILLLINE_TABS do
-		local name, _, offset, numSpells = GetSpellTabInfo(i);
-		if ( not name ) then break; end
+		name, texture, offset, numSpells = GetSpellTabInfo(i);
+		if (not name) then break; end
 		for s = offset + 1, offset + numSpells do
-			local spellName, spellRank = GetSpellName( s, BOOKTYPE_SPELL );
-			if ( spellRank ~= "" ) then spellName = spellName.." "..spellRank; end
-			ABP_SpellBookNameToId[ spellName ] = s;
+			spellName, spellRank = GetSpellName(s, BOOKTYPE_SPELL);
+			if (spellRank ~= "") then spellName = spellName.." "..spellRank; end
+			ABP_SpellIds[spellName] = s;
 		end
 	end
+	return ABP_SpellIds;
+end
+
+function ABP_EquippedGearToId()
 	
-	ABP_Tooltip:SetOwner(this, "ANCHOR_NONE");
-	
-	-- Inventory (equipped) items
+	local ABP_EquippedGearIds = {};
+	local hasItem, _, itemName;
+
 	for i = 1, 19 do
 		ABP_Tooltip:ClearLines();
 		hasItem, _, _ = ABP_Tooltip:SetInventoryItem( "player", i );
-		if ( hasItem ) then
-			local itemName = nil;
-			
-			if ( ABP_TooltipTextLeft1:IsShown() ) then
+		if (hasItem) then
+			itemName = nil;
+			if (ABP_TooltipTextLeft1:IsShown()) then
 				itemName = ABP_TooltipTextLeft1:GetText();
-				ABP_InventoryItemNameToId[ itemName ] = i;
+				ABP_EquippedGearIds[itemName] = i;
 			end
 		end
 	end
+	return ABP_EquippedGearIds;
+end
+
+function ABP_BagItemsToId()
 	
-	-- Bag items
+	local ABP_BagItemIds = {};
+	local texture, itemCount, itemName;
+
 	for i = 0, NUM_BAG_SLOTS do
-		for j = 1, GetContainerNumSlots( i ) do
-			texture, itemCount = GetContainerItemInfo( i, j );
-			if ( texture ) then
+		for j = 1, GetContainerNumSlots(i) do
+			texture, itemCount = GetContainerItemInfo(i, j);
+			if (texture) then
 				ABP_Tooltip:ClearLines();
-				ABP_Tooltip:SetBagItem( i, j );
-				local itemName = nil;
-				
-				if ( ABP_TooltipTextLeft1:IsShown() ) then
+				ABP_Tooltip:SetBagItem(i, j);
+				itemName = nil;
+				if (ABP_TooltipTextLeft1:IsShown()) then
 					itemName = ABP_TooltipTextLeft1:GetText();
-					
-					ABP_BagItemNameToId[ itemName ] = {};
-					ABP_BagItemNameToId[ itemName ][ "bag" ] = i;
-					ABP_BagItemNameToId[ itemName ][ "slot" ] = j;
+					ABP_BagItemIds[itemName] = {};
+					ABP_BagItemIds[itemName]["bag"] = i;
+					ABP_BagItemIds[itemName]["slot"] = j;
 				end
 			end
 		end
 	end
-	
-	
-	-- Place spells, items and macros on the action bars.
-	for i = 1, MAX_ACTIONS do
-		if ( ABP_Layout[ ABP_PlayerName ][ profileName ][ "spells" ][ i ] ~= nil ) then -- It is a spell
-			local spellName = ABP_Layout[ ABP_PlayerName ][ profileName ][ "spells" ][ i ][ "name" ];
-			local spellRank = ABP_Layout[ ABP_PlayerName ][ profileName ][ "spells" ][ i ][ "rank" ];
-			if ( spellRank ~= nil ) then spellName = spellName.." "..spellRank; end
-			local spellID = ABP_SpellBookNameToId[ spellName ];
-			if ( spellID == nil ) then
-				DEFAULT_CHAT_FRAME:AddMessage( "Spell \""..spellName.."\" is not learnt at the moment." );
-				PickupAction( i );
-				ClearCursor();
-			else
-				PickupSpell( spellID, BOOKTYPE_SPELL);
-				PlaceAction( i );
-			end
-		elseif ( ABP_Layout[ ABP_PlayerName ][ profileName ][ "macros" ][ i ] ~= nil ) then -- It is a macro
-			local macroIdx = GetMacroIndexByName( ABP_Layout[ ABP_PlayerName ][ profileName ][ "macros" ][ i ] );
-			if ( macroIdx > 0 ) then
-				PickupMacro( macroIdx );
-				PlaceAction( i );
-			elseif ( GetSuperMacroInfo( ABP_Layout[ ABP_PlayerName ][ profileName ][ "macros" ][ i ], "texture" ) ) then
-				PickupMacro( 0, ABP_Layout[ ABP_PlayerName ][ profileName ][ "macros" ][ i ] );
-				PlaceAction( i );
-			end
-		elseif ( ABP_Layout[ ABP_PlayerName ][ profileName ][ "items" ][ i ] ~= nil ) then -- It is an item
-			local itemName = ABP_Layout[ ABP_PlayerName ][ profileName ][ "items" ][ i ];
-			if ( ABP_InventoryItemNameToId[ itemName ] ~= nil ) then
-				local itemID = ABP_InventoryItemNameToId[ itemName ];
-				PickupInventoryItem( itemID );
-				PlaceAction( i );
-			elseif ( ABP_BagItemNameToId[ itemName ] ~= nil ) then
-				local bagID = ABP_BagItemNameToId[ itemName ][ "bag" ];
-				local slotID = ABP_BagItemNameToId[ itemName ][ "slot" ];
-				PickupContainerItem( bagID, slotID );
-				PlaceAction( i );
-			end
-		elseif ( HasAction( i ) ~= nil ) then
-			PickupAction( i );
-			ClearCursor();
-		end
-	end
-	SetCVar( "autoSelfCast", scStatus );
-	ABP_SpellBookNameToId = {}
-	ABP_InventoryItemNameToId = {}
-	ABP_BagItemNameToId = {}
-	DEFAULT_CHAT_FRAME:AddMessage( "Profile \""..profileName.."\" has been loaded." );
+	return ABP_BagItemIds;
 end
 
 function hasElements( T )
@@ -187,15 +221,14 @@ end
 
 function ABP_ListProfiles()
 	if ( ABP_Layout[ ABP_PlayerName ] == nil or hasElements( ABP_Layout[ ABP_PlayerName ] ) == 0 ) then
-		DEFAULT_CHAT_FRAME:AddMessage( "You have no profiles saved for this character." );
+		DEFAULT_CHAT_FRAME:AddMessage("~~ You have no profiles saved for this character.");
 		return
 	end
-	DEFAULT_CHAT_FRAME:AddMessage( "This character has following profiles saved:" );
+	DEFAULT_CHAT_FRAME:AddMessage("~~ This character has following profiles saved:");
 	
 	for profileName, val in pairs( ABP_Layout[ ABP_PlayerName ] ) do
 		DEFAULT_CHAT_FRAME:AddMessage( profileName );
 	end
-	
 end
 
 function ABP_RemoveProfile( profileName )
@@ -225,29 +258,7 @@ function ABP_OnEvent()
 		end
 		
 		UIDropDownMenu_Initialize( getglobal( "ABP_DropDownMenu" ), ABP_DropDownMenu_OnLoad, "MENU" );
-		ABPButton_UpdatePosition()
-	end
-end
-
-function ABP_SlashCommand(msg)
-	if ( msg == "" ) then
-		DEFAULT_CHAT_FRAME:AddMessage( "ActionBarProfiles, by <Vanguard> of Kronos and Emerald Dream" );
-		DEFAULT_CHAT_FRAME:AddMessage( "/abp save [profileName]" );
-		DEFAULT_CHAT_FRAME:AddMessage( "/abp load [profileName]" );
-		DEFAULT_CHAT_FRAME:AddMessage( "/abp remove [profileName]" );
-		DEFAULT_CHAT_FRAME:AddMessage( "/abp list" );
-	end
-	for profileName in string.gfind( msg, "save (.*)" ) do
-		ABP_SaveProfile( profileName );
-	end
-	for profileName in string.gfind( msg, "load (.*)" ) do
-		ABP_LoadProfile( profileName );
-	end
-	for profileName in string.gfind( msg, "remove (.*)" ) do
-		ABP_RemoveProfile( profileName );
-	end
-	for profileName in string.gfind( msg, "list" ) do
-		ABP_ListProfiles();
+		ABPButton_SetPosition(0, 0)
 	end
 end
 

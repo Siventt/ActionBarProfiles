@@ -58,8 +58,8 @@
 			</OnDragStop>
 			<OnEnter>
 				GameTooltip:SetOwner(this, "ANCHOR_LEFT");
-				GameTooltip:SetText( "ActionBarProfiles" );
-				GameTooltip:AddLine( "Right-click and drag to move this button." );
+				GameTooltip:SetText("ActionBarProfiles");
+				GameTooltip:AddLine("Right-click and drag to move this button.");
 				GameTooltipTextLeft1:SetTextColor(1, 1, 1);
 				GameTooltip:Show();
 			</OnEnter>
