@@ -131,6 +131,9 @@ function ABP_LoadProfile(profileName)
 				if (macroIdx > 0) then
 					PickupMacro(macroIdx);
 					PlaceAction(i);
+				elseif (GetSuperMacroInfo(ABP_Layout[ABP_PlayerName][profileName][i]["macros"], "texture")) then
+					PickupMacro(0, ABP_Layout[ABP_PlayerName][profileName][i]["macros"]);
+					PlaceAction(i)
 				end
 			-- [i] is empty, so clear the slot
 			else
