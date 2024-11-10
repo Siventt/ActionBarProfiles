@@ -1,3 +1,4 @@
+## Interface: 11200
 ## Title: ActionBarProfiles
 ## Notes: Save and load action bar profiles
 ## Author: Ermean <Vanguard>, Emerald Dream 1.12.1, Feenix, Sivent
