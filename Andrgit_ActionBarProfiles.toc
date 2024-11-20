@@ -1,0 +1,8 @@
+## Interface: 11200
+## Title: Andrgit_ActionBarProfiles
+## Notes: Save and load action bar profiles
+## Author: Ermean <Vanguard>, Emerald Dream 1.12.1, Feenix, Sivent
+## Version: 2.0
+## SavedVariables: ABP_Layout, ABP_ButtonPosition
+Andrgit_ActionBarProfiles.lua
+Andrgit_ActionBarProfiles.xml

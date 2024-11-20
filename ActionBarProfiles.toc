@@ -1,8 +1,0 @@
-## Interface: 11200
-## Title: ActionBarProfiles
-## Notes: Save and load action bar profiles
-## Author: Ermean <Vanguard>, Emerald Dream 1.12.1, Feenix, Sivent
-## Version: 2.0
-## SavedVariables: ABP_Layout, ABP_ButtonPosition
-ActionBarProfiles.lua
-ActionBarProfiles.xml
