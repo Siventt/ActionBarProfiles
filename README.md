@@ -1,4 +1,9 @@
 # ActionBarProfiles
+
+# This addon is no longer maintained, I suggest using SimpleActionSets instead.
+https://github.com/pepopo978/SimpleActionSets
+
+
 Vanilla WoW addon that saves and restores layout of one's action bars.
 
 `Created by Threewords of the guild "Vanguard"`
